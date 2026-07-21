@@ -54,7 +54,7 @@ npm run build
 npm run test
 ```
 
-The thirteen focused tests demonstrate:
+The eighteen focused tests demonstrate:
 
 1. Mid-conversation cancel-and-replace intent handling
 2. Unavailable-item rejection with grounded alternatives
@@ -69,6 +69,11 @@ The thirteen focused tests demonstrate:
 11. Grounded mild-item recommendations
 12. Greetings, thanks, and goodbyes
 13. Reference resolution sourced from session context
+14. Unavailable-item rejection for “what about” inquiries
+15. “Changed my mind” remove-and-replace corrections
+16. Adding a previously removed item back through pronoun context
+17. Item-specific gluten-free tag answers
+18. Rejection of signed negative quantities
 
 Regenerate both checked-in sample transcripts by driving the actual CLI in
 deterministic mock mode:

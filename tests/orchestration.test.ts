@@ -131,4 +131,69 @@ describe('core orchestration', () => {
     expect(response).toContain('Removed Paneer Tikka');
     expect(orchestrator.getOrderState().items).toHaveLength(0);
   });
+
+  test('rejects unavailable items in what-about information queries', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    const response = await orchestrator.processUserInput(
+      'What about the Mutton Rogan Josh?',
+    );
+
+    expect(response).toContain('Mutton Rogan Josh is unavailable');
+    expect(response).toContain('Sold out for the day');
+    expect(orchestrator.getOrderState().items).toHaveLength(0);
+  });
+
+  test('treats changed-my-mind as a remove-and-replace correction', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    await orchestrator.processUserInput('Add Mango Lassi');
+    const response = await orchestrator.processUserInput(
+      'I changed my mind, remove the lassi and add Fresh Lime Soda',
+    );
+
+    expect(response).toContain('Removed Mango Lassi');
+    expect(response).toContain('Added 1 x Fresh Lime Soda');
+    expect(orchestrator.getOrderState().items.map((item) => item.menuItemId)).toEqual([
+      'd3',
+    ]);
+  });
+
+  test('adds a previously removed item back through a pronoun reference', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    await orchestrator.processUserInput('Add Dal Makhani');
+    await orchestrator.processUserInput('Remove Dal Makhani');
+    const response = await orchestrator.processUserInput('Actually add it back');
+
+    expect(response).toContain('Added 1 x Dal Makhani');
+    expect(orchestrator.getOrderState().items).toMatchObject([
+      { menuItemId: 'm3', quantity: 1 },
+    ]);
+  });
+
+  test('answers item-specific gluten-free tag questions without ordering', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    const response = await orchestrator.processUserInput(
+      'Is the Crispy Corn gluten free?',
+    );
+
+    expect(response).toContain('Yes, Crispy Corn is gluten-free');
+    expect(orchestrator.getOrderState().items).toHaveLength(0);
+  });
+
+  test('rejects signed negative quantities instead of converting them to positive', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    const response = await orchestrator.processUserInput('Add -1 Mango Lassi');
+
+    expect(response).toContain('Quantity must be a positive whole number');
+    expect(orchestrator.getOrderState().items).toHaveLength(0);
+  });
 });
