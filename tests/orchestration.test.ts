@@ -237,4 +237,40 @@ describe('core orchestration', () => {
       totalAmount: 1345,
     });
   });
+
+  test('removes only the requested quantity from a multi-quantity item', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    await orchestrator.processUserInput(
+      '2 Paneer tikka, 5 veg biryani, 2 butter chicken, 2 mango lassi, 1 crispy corn and 3 kulfi falooda',
+    );
+    const response = await orchestrator.processUserInput(
+      'remove 1 kulfi falooda',
+    );
+
+    expect(response).toContain('Removed 1 x Kulfi Falooda');
+    expect(response).toContain('2 remain in your order');
+    expect(response).toContain('Your total is \u20b92,191');
+    const orderState = orchestrator.getOrderState();
+    expect(orderState).toMatchObject({
+      itemCount: 9,
+      totalAmount: 2191,
+    });
+    expect(
+      orderState.items.find((item) => item.menuItemId === 'x2'),
+    ).toMatchObject({
+      name: 'Kulfi Falooda',
+      quantity: 2,
+      subtotal: 398,
+    });
+
+    const excessiveRemoval = await orchestrator.processUserInput(
+      'remove 3 kulfi falooda',
+    );
+    expect(excessiveRemoval).toContain(
+      'You only have 2 x Kulfi Falooda in your order',
+    );
+    expect(orchestrator.getOrderState()).toEqual(orderState);
+  });
 });

@@ -145,13 +145,16 @@ function parseQuantity(input: string): number {
 /**
  * Extract the quantity that immediately precedes a specific item name in the
  * input string. For example, given "2 Mango Lassi" and itemName "Mango Lassi",
- * this returns 2. Falls back to 1 when no per-item quantity is found.
+ * this returns 2. Returns undefined when no per-item quantity is found.
  */
-function parsePerItemQuantity(input: string, itemName: string): number {
+function findPerItemQuantity(
+  input: string,
+  itemName: string,
+): number | undefined {
   const normalizedInput = normalize(input);
   const normalizedName = normalize(itemName);
   const idx = normalizedInput.indexOf(normalizedName);
-  if (idx <= 0) return 1;
+  if (idx <= 0) return undefined;
 
   // Look at the token(s) immediately before the item name
   const preceding = normalizedInput.slice(0, idx).trim();
@@ -160,7 +163,12 @@ function parsePerItemQuantity(input: string, itemName: string): number {
   const numeric = Number(lastToken);
   if (Number.isInteger(numeric) && numeric >= 1) return numeric;
   if (quantityWords[lastToken]) return quantityWords[lastToken]!;
-  return 1;
+  return undefined;
+}
+
+function parsePerItemQuantity(input: string, itemName: string): number {
+  // Addition listings default to one when an item has no explicit quantity.
+  return findPerItemQuantity(input, itemName) ?? 1;
 }
 
 function isExplicitMultiItemListing(input: string, itemCount: number): boolean {
@@ -738,6 +746,35 @@ export class MockLLMClient implements LLMClient {
     const confirmations: string[] = [];
     let changed = false;
     for (const item of removalTargets) {
+      const orderItem = summary.items.find(
+        (candidate) => candidate.menuItemId === item.id,
+      );
+      const removalQuantity = findPerItemQuantity(input, item.name);
+      if (orderItem && removalQuantity !== undefined) {
+        if (removalQuantity > orderItem.quantity) {
+          confirmations.push(
+            `You only have ${orderItem.quantity} x ${item.name} in your order, so I cannot remove ${removalQuantity}.`,
+          );
+          continue;
+        }
+
+        const remainingQuantity = orderItem.quantity - removalQuantity;
+        if (remainingQuantity > 0) {
+          const result = await runTool<ModifyOrderResult>(tools.modifyOrder, {
+            itemId: item.id,
+            action: 'update_quantity',
+            newQuantity: remainingQuantity,
+          });
+          confirmations.push(
+            result.success
+              ? `Removed ${removalQuantity} x ${item.name}. ${remainingQuantity} ${remainingQuantity === 1 ? 'remains' : 'remain'} in your order.`
+              : result.message,
+          );
+          changed ||= result.success;
+          continue;
+        }
+      }
+
       const result = await runTool<ModifyOrderResult>(tools.modifyOrder, {
         itemId: item.id,
         action: 'remove',

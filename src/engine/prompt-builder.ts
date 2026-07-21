@@ -19,6 +19,7 @@ export function buildSystemPrompt(
 7. Always confirm successful order changes with item names and grounded prices or totals.
 8. Keep responses natural, warm, and concise (2-3 sentences maximum).
 9. Treat CURRENT ORDER as read-only context; only tools may mutate it.
+10. "Remove N [item]" means subtract N from its current quantity; remove the whole line only when no quantity is given or none would remain.
 
 ## MENU DATA
 ${JSON.stringify(menu, null, 2)}
