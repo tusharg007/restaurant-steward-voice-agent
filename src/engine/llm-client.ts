@@ -142,6 +142,27 @@ function parseQuantity(input: string): number {
   return 1;
 }
 
+/**
+ * Extract the quantity that immediately precedes a specific item name in the
+ * input string. For example, given "2 Mango Lassi" and itemName "Mango Lassi",
+ * this returns 2. Falls back to 1 when no per-item quantity is found.
+ */
+function parsePerItemQuantity(input: string, itemName: string): number {
+  const normalizedInput = normalize(input);
+  const normalizedName = normalize(itemName);
+  const idx = normalizedInput.indexOf(normalizedName);
+  if (idx <= 0) return 1;
+
+  // Look at the token(s) immediately before the item name
+  const preceding = normalizedInput.slice(0, idx).trim();
+  const lastToken = preceding.split(' ').pop() ?? '';
+
+  const numeric = Number(lastToken);
+  if (Number.isInteger(numeric) && numeric >= 1) return numeric;
+  if (quantityWords[lastToken]) return quantityWords[lastToken]!;
+  return 1;
+}
+
 function menuItems(menu: Menu): MenuItem[] {
   return menu.categories.flatMap((category) => category.items);
 }
@@ -274,6 +295,56 @@ export class MockLLMClient implements LLMClient {
 
     if (/^(bye|goodbye|see you)$/.test(normalized)) {
       return { text: 'Goodbye! Thank you for visiting Namaste Kitchen.' };
+    }
+
+    // Handle "yes" / "sure" / "go ahead" confirmations.
+    // If the previous assistant turn asked "Would you like to add X?", the
+    // referenced items will be resolvable from the last assistant message.
+    if (/^(yes|yeah|yep|sure|ok|okay|go ahead|please|do it|absolutely)$/.test(normalized)) {
+      const previousAssistant = [...messages]
+        .reverse()
+        .find((message) => message.role === 'assistant');
+      const previousText = previousAssistant
+        ? modelMessageText(previousAssistant)
+        : '';
+      const previouslyMentioned = resolveMentionedItems(previousText, this.menu);
+      if (previouslyMentioned.length > 0) {
+        const confirmations: string[] = [];
+        let changed = false;
+        for (const item of previouslyMentioned) {
+          const availability = await runTool<AvailabilityResult>(
+            tools.checkAvailability,
+            { itemName: item.name },
+          );
+          if (!availability.available || !availability.item) {
+            confirmations.push(`${item.name} is unavailable.`);
+            continue;
+          }
+          const result = await runTool<OrderToolResult>(tools.addToOrder, {
+            itemId: item.id,
+            quantity: 1,
+          });
+          confirmations.push(result.message);
+          changed ||= result.success;
+        }
+        if (confirmations.length > 0) {
+          const latestSummary = await runTool<OrderSummaryResult>(
+            tools.getOrderSummary,
+            {},
+          );
+          return {
+            text: `${confirmations.join(' ')}${
+              changed
+                ? ` Your total is ${formatMoney(latestSummary.totalAmount)}.`
+                : ''
+            }`,
+            referencedItemIds: previouslyMentioned.map((item) => item.id),
+          };
+        }
+      }
+      return {
+        text: "Sure! What would you like to order?",
+      };
     }
 
     if (/\bvegan\b/.test(normalized)) {
@@ -496,16 +567,26 @@ export class MockLLMClient implements LLMClient {
       }
     }
 
+    // If the user lists multiple items separated by commas or "and" (e.g.
+    // "1 Crispy Corn, 2 Mango Lassi, and 1 Kulfi Falooda"), treat the listing
+    // as an implicit ordering intent even without an explicit verb.
     if (
       mentionedItems.length > 0 &&
       !wantsRemoval &&
       !wantsQuantityChange &&
       !wantsAddition
     ) {
-      return {
-        text: `Would you like to add ${mentionedItems.map((item) => item.name).join(' and ')} to your order?`,
-        referencedItemIds,
-      };
+      const isItemListing =
+        mentionedItems.length >= 2 &&
+        (/,/.test(normalized) || /\band\b/.test(normalized));
+      if (!isItemListing) {
+        return {
+          text: `Would you like to add ${mentionedItems.map((item) => item.name).join(' and ')} to your order?`,
+          referencedItemIds,
+        };
+      }
+      // Fall through to the ordering logic below by treating the listing as
+      // an implicit addition.
     }
 
     if ((wantsRemoval || wantsQuantityChange) && mentionedItems.length === 0) {
@@ -596,7 +677,7 @@ export class MockLLMClient implements LLMClient {
       changed ||= result.success;
     }
 
-    const requestedQuantity = parseQuantity(input);
+    const globalQuantity = parseQuantity(input);
     for (const item of additionTargets) {
       const existing = summary.items.find(
         (orderItem) => orderItem.menuItemId === item.id,
@@ -605,7 +686,7 @@ export class MockLLMClient implements LLMClient {
         const result = await runTool<ModifyOrderResult>(tools.modifyOrder, {
           itemId: item.id,
           action: 'update_quantity',
-          newQuantity: requestedQuantity,
+          newQuantity: globalQuantity,
         });
         confirmations.push(result.message);
         changed ||= result.success;
@@ -628,9 +709,15 @@ export class MockLLMClient implements LLMClient {
         continue;
       }
 
+      // Use per-item quantity when multiple items are listed ("1 X, 2 Y"),
+      // otherwise fall back to the single global quantity.
+      const itemQuantity =
+        additionTargets.length > 1
+          ? parsePerItemQuantity(input, item.name)
+          : globalQuantity;
       const result = await runTool<OrderToolResult>(tools.addToOrder, {
         itemId: item.id,
-        quantity: requestedQuantity,
+        quantity: itemQuantity,
       });
       confirmations.push(result.message);
       changed ||= result.success;
