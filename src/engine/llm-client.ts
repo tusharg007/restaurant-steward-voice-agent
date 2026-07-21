@@ -416,7 +416,45 @@ export class MockLLMClient implements LLMClient {
       };
     }
 
+    const summary = await runTool<OrderSummaryResult>(tools.getOrderSummary, {});
+
     if (/\bspic(y|e|iness)\b/.test(normalized)) {
+      // "Is there anything spicy in my order?" — check current order items
+      if (
+        mentionedItems.length === 0 &&
+        /\b(my order|order|ordered)\b/.test(normalized)
+      ) {
+        const orderItems = summary.items;
+        if (orderItems.length === 0) {
+          return { text: 'Your order is empty, so there are no spicy items yet.' };
+        }
+        const spiceReport = orderItems
+          .map((orderItem) => {
+            const menuItem = findItemById(orderItem.menuItemId, this.menu);
+            return menuItem
+              ? { name: menuItem.name, spiceLevel: menuItem.spiceLevel ?? 'not specified' }
+              : null;
+          })
+          .filter((item): item is { name: string; spiceLevel: string } => item !== null);
+        const hotItems = spiceReport.filter((item) => item.spiceLevel === 'hot');
+        const mediumItems = spiceReport.filter((item) => item.spiceLevel === 'medium');
+        const parts: string[] = [];
+        if (hotItems.length > 0) {
+          parts.push(`${hotItems.map((item) => item.name).join(', ')} ${hotItems.length === 1 ? 'is' : 'are'} hot/spicy`);
+        }
+        if (mediumItems.length > 0) {
+          parts.push(`${mediumItems.map((item) => item.name).join(', ')} ${mediumItems.length === 1 ? 'has' : 'have'} medium spice`);
+        }
+        const mildItems = spiceReport.filter((item) => item.spiceLevel === 'mild');
+        if (mildItems.length > 0) {
+          parts.push(`${mildItems.map((item) => item.name).join(', ')} ${mildItems.length === 1 ? 'is' : 'are'} mild`);
+        }
+        return {
+          text: parts.length > 0
+            ? `In your current order: ${parts.join('; ')}.`
+            : 'None of the items in your order have a specified spice level.',
+        };
+      }
       if (
         mentionedItems.length === 0 &&
         /\b(not too spicy|mild|less spicy|low spice)\b/.test(normalized)
@@ -455,13 +493,11 @@ export class MockLLMClient implements LLMClient {
       const categorySummary = this.menu.categories
         .map((category) => {
           const available = category.items.filter((item) => item.available);
-          return `${category.name}: ${available.map((item) => item.name).join(', ')}`;
+          return `${category.name}: ${available.map((item) => `${item.name} (${formatMoney(item.price)})`).join(', ')}`;
         })
-        .join('; ');
-      return { text: `Here are today's available choices - ${categorySummary}.` };
+        .join('\n');
+      return { text: `Here is our menu:\n${categorySummary}` };
     }
-
-    const summary = await runTool<OrderSummaryResult>(tools.getOrderSummary, {});
 
     if (/\b(summary|current order|what.*ordered|that s all|done)\b/.test(normalized)) {
       return { text: summary.formattedSummary };
@@ -579,6 +615,28 @@ export class MockLLMClient implements LLMClient {
       const isItemListing =
         mentionedItems.length >= 2 &&
         (/,/.test(normalized) || /\band\b/.test(normalized));
+
+      // If the previous assistant turn was asking about something (spice,
+      // price, description, tag) and the user just names an item to answer
+      // that question, provide the contextual info instead of adding.
+      if (!isItemListing && mentionedItems.length === 1) {
+        const previousAssistant = [...messages]
+          .reverse()
+          .find((message) => message.role === 'assistant');
+        const prevText = previousAssistant
+          ? normalize(modelMessageText(previousAssistant))
+          : '';
+        const prevAskedSpice = /spic(y|e|iness)|which.*item.*know|which.*mean/.test(prevText);
+        const prevAskedInfo = /would you like to know|tell me about|which.*item/.test(prevText);
+        if (prevAskedSpice || prevAskedInfo) {
+          const item = mentionedItems[0]!;
+          return {
+            text: `${item.name} has a ${item.spiceLevel ?? 'not specified'} spice level. ${item.description}. It costs ${formatMoney(item.price)}.`,
+            referencedItemIds: [item.id],
+          };
+        }
+      }
+
       if (!isItemListing) {
         return {
           text: `Would you like to add ${mentionedItems.map((item) => item.name).join(' and ')} to your order?`,
@@ -728,10 +786,20 @@ export class MockLLMClient implements LLMClient {
         tools.getOrderSummary,
         {},
       );
+
+      // Proactive menu-grounded follow-up on first order addition:
+      // ask about dietary or spice preferences so the customer doesn't
+      // discover issues (e.g. too spicy, not vegan) after ordering.
+      let proactivePrompt = '';
+      if (summary.items.length === 0 && latestSummary.items.length > 0) {
+        proactivePrompt =
+          ' Any dietary preferences or spice concerns I should know about?';
+      }
+
       const response: LLMResponse = {
         text: `${confirmations.join(' ')}${
           changed ? ` Your total is ${formatMoney(latestSummary.totalAmount)}.` : ''
-        }`,
+        }${proactivePrompt}`,
       };
       response.referencedItemIds = referencedItemIds;
       return response;

@@ -1,10 +1,14 @@
 [USER] Hi, what do you have?
 
-[STEWARD] Here are today's available choices - Starters: Paneer Tikka, Chicken Seekh Kebab, Crispy Corn; Mains: Butter Chicken, Chicken Tikka Masala, Dal Makhani, Veg Biryani; Drinks: Mango Lassi, Masala Chaas, Fresh Lime Soda; Desserts: Gulab Jamun, Kulfi Falooda, Rasmalai.
+[STEWARD] Here is our menu:
+Starters: Paneer Tikka (₹249), Chicken Seekh Kebab (₹299), Crispy Corn (₹199)
+Mains: Butter Chicken (₹399), Chicken Tikka Masala (₹429), Dal Makhani (₹299), Veg Biryani (₹329)
+Drinks: Mango Lassi (₹149), Masala Chaas (₹99), Fresh Lime Soda (₹89)
+Desserts: Gulab Jamun (₹149), Kulfi Falooda (₹199), Rasmalai (₹179)
 
 [USER] I'll have the Butter Chicken and a Mango Lassi.
 
-[STEWARD] Added 1 x Butter Chicken. Added 1 x Mango Lassi. Your total is ₹548.
+[STEWARD] Added 1 x Butter Chicken. Added 1 x Mango Lassi. Your total is ₹548. Any dietary preferences or spice concerns I should know about?
 
 [USER] Make it two lassis.
 
