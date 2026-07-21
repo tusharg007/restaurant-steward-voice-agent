@@ -1,6 +1,7 @@
 import {
   findCategoryForItem,
   findItemByName,
+  getAvailableItems,
   getItemsByCategory,
   loadMenu,
 } from '../state/menu-loader.js';
@@ -13,6 +14,24 @@ export interface AvailabilityResult {
   available?: boolean;
   reason?: string;
   alternatives?: MenuItem[];
+}
+
+function matchesDietaryPreference(
+  unavailableItem: MenuItem,
+  candidate: MenuItem,
+): boolean {
+  if (unavailableItem.tags.includes('vegan')) {
+    return candidate.tags.includes('vegan');
+  }
+  if (unavailableItem.tags.includes('vegetarian')) {
+    return (
+      candidate.tags.includes('vegetarian') || candidate.tags.includes('vegan')
+    );
+  }
+  if (unavailableItem.tags.includes('non-veg')) {
+    return candidate.tags.includes('non-veg');
+  }
+  return true;
 }
 
 export function checkAvailability(
@@ -37,11 +56,17 @@ export function checkAvailability(
   }
 
   const category = findCategoryForItem(match.id, menu);
-  const alternatives = category
-    ? getItemsByCategory(category, menu)
-        .filter((item) => item.available && item.id !== match.id)
-        .slice(0, 3)
-    : [];
+  const sameCategoryItems = category ? getItemsByCategory(category, menu) : [];
+  const candidates = [...sameCategoryItems, ...getAvailableItems(menu)];
+  const alternatives = candidates
+    .filter(
+      (item, index, items) =>
+        item.id !== match.id &&
+        item.available &&
+        matchesDietaryPreference(match, item) &&
+        items.findIndex((candidate) => candidate.id === item.id) === index,
+    )
+    .slice(0, 3);
 
   return {
     found: true,

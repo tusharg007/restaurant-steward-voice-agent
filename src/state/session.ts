@@ -1,3 +1,5 @@
+import type { ModelMessage } from '@ai-sdk/provider-utils';
+
 import type {
   ConversationMessage,
   MessageRole,
@@ -17,13 +19,26 @@ function cloneMessage(message: ConversationMessage): ConversationMessage {
   return { ...message, timestamp: new Date(message.timestamp) };
 }
 
+function cloneModelMessage(message: ModelMessage): ModelMessage {
+  return structuredClone(message);
+}
+
 export class SessionManager {
   private orderState: OrderState = createEmptyOrder();
   private conversationHistory: ConversationMessage[] = [];
+  private modelHistory: ModelMessage[] = [];
   private lastMentionedItemId?: string;
 
   addMessage(role: MessageRole, content: string): void {
     this.conversationHistory.push({ role, content, timestamp: new Date() });
+  }
+
+  addModelMessage(message: ModelMessage): void {
+    this.modelHistory.push(cloneModelMessage(message));
+  }
+
+  addModelMessages(messages: ModelMessage[]): void {
+    this.modelHistory.push(...messages.map(cloneModelMessage));
   }
 
   getOrderState(): OrderState {
@@ -45,6 +60,7 @@ export class SessionManager {
   getContext(): SessionContext {
     const context: SessionContext = {
       conversationHistory: this.getConversationHistory(),
+      modelHistory: this.getModelHistory(),
       orderState: this.getOrderState(),
     };
     if (this.lastMentionedItemId !== undefined) {
@@ -55,5 +71,9 @@ export class SessionManager {
 
   getConversationHistory(): ConversationMessage[] {
     return this.conversationHistory.map(cloneMessage);
+  }
+
+  getModelHistory(): ModelMessage[] {
+    return this.modelHistory.map(cloneModelMessage);
   }
 }

@@ -28,6 +28,7 @@ export class Orchestrator {
 
     const orderBeforeTurn = this.session.getOrderState();
     this.session.addMessage('user', transcribedText);
+    this.session.addModelMessage({ role: 'user', content: transcribedText });
 
     const systemPrompt = buildSystemPrompt(
       this.menu,
@@ -37,13 +38,18 @@ export class Orchestrator {
     const tools = createBoundTools(this.session, this.menu);
     const response = await this.llmClient.generateResponse(
       systemPrompt,
-      this.session.getConversationHistory(),
+      this.session.getModelHistory(),
       tools,
     );
     const agentReply =
       response.text.trim() || 'I am sorry, I could not complete that request.';
 
     this.session.addMessage('assistant', agentReply);
+    if (response.responseMessages?.length) {
+      this.session.addModelMessages(response.responseMessages);
+    } else {
+      this.session.addModelMessage({ role: 'assistant', content: agentReply });
+    }
     this.updateLastMentionedItem(response, transcribedText, orderBeforeTurn);
     synthesize(agentReply);
     return agentReply;

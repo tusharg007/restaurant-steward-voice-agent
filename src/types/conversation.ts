@@ -1,3 +1,5 @@
+import type { ModelMessage } from '@ai-sdk/provider-utils';
+
 import type { OrderState } from './order.js';
 
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool';
@@ -10,6 +12,7 @@ export interface ConversationMessage {
 
 export interface SessionContext {
   conversationHistory: ConversationMessage[];
+  modelHistory: ModelMessage[];
   orderState: OrderState;
   lastMentionedItemId?: string;
 }

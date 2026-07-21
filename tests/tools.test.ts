@@ -26,4 +26,26 @@ describe('grounded tools', () => {
       totalAmount: 0,
     });
   });
+
+  test('keeps unavailable-item alternatives compatible with dietary tags', () => {
+    const menu = loadMenu();
+    const fishResult = checkAvailability('Fish Amritsari', menu);
+
+    expect(fishResult.alternatives).not.toHaveLength(0);
+    expect(
+      fishResult.alternatives?.every((item) => item.tags.includes('non-veg')),
+    ).toBe(true);
+
+    const vegBiryani = menu.categories
+      .flatMap((category) => category.items)
+      .find((item) => item.id === 'm4')!;
+    vegBiryani.available = false;
+    vegBiryani.unavailableReason = 'Sold out for this test';
+
+    const veganResult = checkAvailability('Veg Biryani', menu);
+    expect(veganResult.alternatives).not.toHaveLength(0);
+    expect(
+      veganResult.alternatives?.every((item) => item.tags.includes('vegan')),
+    ).toBe(true);
+  });
 });

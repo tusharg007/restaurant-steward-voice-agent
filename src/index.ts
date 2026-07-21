@@ -34,6 +34,22 @@ export function saveConversationLog(
   return logPath;
 }
 
+function requestedLogFilename(args: string[]): string | undefined {
+  const inlineValue = args
+    .find((argument) => argument.startsWith('--log-file='))
+    ?.slice('--log-file='.length);
+  const separateIndex = args.indexOf('--log-file');
+  const value = inlineValue ?? (separateIndex >= 0 ? args[separateIndex + 1] : undefined);
+
+  if (!value) {
+    return undefined;
+  }
+  if (path.basename(value) !== value || !/^[a-zA-Z0-9._-]+\.log$/.test(value)) {
+    throw new Error('--log-file must be a simple .log filename.');
+  }
+  return value;
+}
+
 function printOrderSummary(orderState: OrderState): void {
   console.log(chalk.bold.yellow('\nFinal order'));
   console.log(chalk.white(getOrderSummary(orderState)));
@@ -55,6 +71,7 @@ function createClient(menu: Menu): { client: LLMClient; mode: string } {
 }
 
 async function main(): Promise<void> {
+  const logFilename = requestedLogFilename(process.argv.slice(2));
   const menu = loadMenu();
   const { client, mode } = createClient(menu);
   const orchestrator = new Orchestrator(menu, client);
@@ -100,7 +117,10 @@ async function main(): Promise<void> {
   } finally {
     terminal.close();
     printOrderSummary(orchestrator.getOrderState());
-    const logPath = saveConversationLog(orchestrator.getConversationLog());
+    const logPath = saveConversationLog(
+      orchestrator.getConversationLog(),
+      logFilename,
+    );
     console.log(chalk.dim(`Conversation saved to ${logPath}\n`));
   }
 }

@@ -1,6 +1,6 @@
 [USER] Can I get the Fish Amritsari?
 
-[STEWARD] Fish Amritsari is unavailable - Fresh fish not available today. May I suggest Paneer Tikka (₹249) or Chicken Seekh Kebab (₹299) or Crispy Corn (₹199)?
+[STEWARD] Fish Amritsari is unavailable - Fresh fish not available today. May I suggest Chicken Seekh Kebab (₹299) or Butter Chicken (₹399) or Chicken Tikka Masala (₹429)?
 
 [USER] Fine, I'll take the Chicken Seekh Kebab and add a Veg Biryani.
 
@@ -13,3 +13,7 @@
 [USER] Actually, cancel the Chicken Seekh Kebab and add the Chicken Tikka Masala instead.
 
 [STEWARD] Removed Chicken Seekh Kebab from the order. Added 1 x Chicken Tikka Masala. Your total is ₹758.
+
+[USER] What's my current order?
+
+[STEWARD] Veg Biryani x1 (₹329), Chicken Tikka Masala x1 (₹429). Total: ₹758.

@@ -1,12 +1,12 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { generateText, stepCountIs } from 'ai';
+import type { ModelMessage } from '@ai-sdk/provider-utils';
+import { generateText, stepCountIs, type LanguageModel } from 'ai';
 
 import {
   findItemByName,
   getAvailableItems,
   getItemsByTag,
 } from '../state/menu-loader.js';
-import type { ConversationMessage } from '../types/conversation.js';
 import type { Menu, MenuItem } from '../types/menu.js';
 import type { OrderState } from '../types/order.js';
 import type { AgentTools } from '../tools/registry.js';
@@ -18,12 +18,13 @@ import type { ModifyOrderResult } from '../tools/modify-order.js';
 export interface LLMResponse {
   text: string;
   referencedItemIds?: string[];
+  responseMessages?: ModelMessage[];
 }
 
 export interface LLMClient {
   generateResponse(
     systemPrompt: string,
-    messages: ConversationMessage[],
+    messages: ModelMessage[],
     tools: AgentTools,
   ): Promise<LLMResponse>;
 }
@@ -31,39 +32,56 @@ export interface LLMClient {
 export interface OpenAIClientOptions {
   apiKey: string;
   model?: string;
+  generate?: OpenAIGenerate;
 }
+
+interface OpenAIGenerateOptions {
+  model: LanguageModel;
+  system: string;
+  messages: ModelMessage[];
+  tools: AgentTools;
+}
+
+type OpenAIGenerate = (
+  options: OpenAIGenerateOptions,
+) => Promise<{ text: string; responseMessages: ModelMessage[] }>;
 
 export class OpenAIClient implements LLMClient {
   private readonly provider: ReturnType<typeof createOpenAI>;
   private readonly model: string;
+  private readonly generate: OpenAIGenerate;
 
-  constructor({ apiKey, model = 'gpt-4o-mini' }: OpenAIClientOptions) {
+  constructor({
+    apiKey,
+    model = 'gpt-4o-mini',
+    generate,
+  }: OpenAIClientOptions) {
     this.provider = createOpenAI({ apiKey });
     this.model = model;
+    this.generate =
+      generate ??
+      (async (options) =>
+        generateText({ ...options, stopWhen: stepCountIs(5) }));
   }
 
   async generateResponse(
     systemPrompt: string,
-    messages: ConversationMessage[],
+    messages: ModelMessage[],
     tools: AgentTools,
   ): Promise<LLMResponse> {
-    const modelMessages = messages
-      .filter(
-        (message): message is ConversationMessage & {
-          role: 'user' | 'assistant';
-        } => message.role === 'user' || message.role === 'assistant',
-      )
-      .map(({ role, content }) => ({ role, content }));
-
-    const result = await generateText({
+    const result = await this.generate({
       model: this.provider(this.model),
       system: systemPrompt,
-      messages: modelMessages,
+      messages,
       tools,
-      stopWhen: stepCountIs(5),
     });
 
-    return { text: result.text.trim() };
+    return {
+      text: result.text.trim(),
+      // AI SDK v7 returns the accumulated assistant tool-call, tool-result,
+      // and final assistant messages in provider-ready order.
+      responseMessages: result.responseMessages,
+    };
   }
 }
 
@@ -118,6 +136,22 @@ function parseQuantity(input: string): number {
 
 function menuItems(menu: Menu): MenuItem[] {
   return menu.categories.flatMap((category) => category.items);
+}
+
+function modelMessageText(message: ModelMessage): string {
+  if (message.role === 'tool') {
+    return '';
+  }
+  if (typeof message.content === 'string') {
+    return message.content;
+  }
+  return message.content
+    .filter(
+      (part): part is { type: 'text'; text: string } =>
+        part.type === 'text' && 'text' in part,
+    )
+    .map((part) => part.text)
+    .join(' ');
 }
 
 function resolveMentionedItems(input: string, menu: Menu): MenuItem[] {
@@ -194,13 +228,13 @@ export class MockLLMClient implements LLMClient {
 
   async generateResponse(
     _systemPrompt: string,
-    messages: ConversationMessage[],
+    messages: ModelMessage[],
     tools: AgentTools,
   ): Promise<LLMResponse> {
     const latestUserMessage = [...messages]
       .reverse()
       .find((message) => message.role === 'user');
-    const input = latestUserMessage?.content ?? '';
+    const input = latestUserMessage ? modelMessageText(latestUserMessage) : '';
     const normalized = normalize(input);
     const mentionedItems = resolveMentionedItems(input, this.menu);
     const referencedItemIds = mentionedItems.map((item) => item.id);
