@@ -54,28 +54,14 @@ npm run build
 npm run test
 ```
 
-The twenty focused tests demonstrate:
+The complete suite contains twenty focused tests. These five are the key
+reviewer tests for the core orchestration requirements:
 
-1. Mid-conversation cancel-and-replace intent handling
-2. Unavailable-item rejection with grounded alternatives
-3. Correct immutable state through add/update/remove operations
-4. Rejection of items absent from the menu dataset
-5. Enforcement of limited quantities
-6. Structured assistant tool-call and tool-result history across turns
-7. Dietary-compatible alternatives for unavailable items
-8. Price and description questions that never mutate the order
-9. Item-specific vegan answers
-10. Whole-order clearing
-11. Grounded mild-item recommendations
-12. Greetings, thanks, and goodbyes
-13. Reference resolution sourced from session context
-14. Unavailable-item rejection for “what about” inquiries
-15. “Changed my mind” remove-and-replace corrections
-16. Adding a previously removed item back through pronoun context
-17. Item-specific gluten-free tag answers
-18. Rejection of signed negative quantities
-19. Comma-separated quantified orders with per-item availability limits
-20. Partial-quantity removal without deleting the entire order line
+1. [Mid-conversation cancel-and-replace intent change](tests/orchestration.test.ts)
+2. [Unavailable-item rejection with grounded alternatives](tests/orchestration.test.ts)
+3. [Partial-quantity removal without deleting the order line](tests/orchestration.test.ts)
+4. [Immutable order-state add/update/remove cycle](tests/state.test.ts)
+5. [Assistant tool-call and tool-result history across turns](tests/model-history.test.ts)
 
 Regenerate both checked-in sample transcripts by driving the actual CLI in
 deterministic mock mode:
@@ -86,7 +72,7 @@ npm run logs:generate
 
 ## Grounding and state guarantees
 
-- `src/data/menu.json` is the sole source for item names, IDs, prices, descriptions, tags, spice levels, and availability.
+- [`src/data/menu.json`](src/data/menu.json) is the sole source for item names, IDs, prices, descriptions, tags, spice levels, and availability.
 - Name lookup is case-insensitive and supports partial matches. Ambiguous matches return all candidates so the agent can clarify rather than guess.
 - `OrderState` is not LLM memory. Pure functions return new objects and recalculate quantity counts and totals.
 - Tools revalidate menu existence, availability, quantities, and cart membership before each mutation.
@@ -136,10 +122,24 @@ src/
   types/                # Menu, order, and conversation contracts
   config.ts
   index.ts               # CLI entry point
-tests/                   # Five focused Vitest cases
+tests/                   # Twenty focused tests across four Vitest suites
 scripts/                 # Reproducible CLI-driven sample-log generator
 logs/                    # CLI-generated samples + runtime transcripts
+docs/screenshots/        # Screenshots rendered from the generated CLI transcripts
 ```
+
+## Working CLI demo
+
+The screenshots below are generated from the exact checked-in CLI transcripts,
+which are produced by running the application through `npm run logs:generate`.
+
+### Ordering and quantity update
+
+![CLI ordering and quantity-update demo](docs/screenshots/cli-order-modification.png)
+
+### Unavailable item and mid-conversation order modification
+
+![CLI unavailable-item and order-modification demo](docs/screenshots/cli-unavailable-item.png)
 
 ## Sample conversations
 
