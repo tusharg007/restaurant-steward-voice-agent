@@ -1,0 +1,15 @@
+[USER] Can I get the Fish Amritsari?
+
+[STEWARD] Fish Amritsari is unavailable - Fresh fish not available today. May I suggest Paneer Tikka (₹249) or Chicken Seekh Kebab (₹299) or Crispy Corn (₹199)?
+
+[USER] Fine, I'll take the Chicken Seekh Kebab and add a Veg Biryani.
+
+[STEWARD] Added 1 x Chicken Seekh Kebab. Added 1 x Veg Biryani. Note: Veg Biryani has limited availability today. Your total is ₹628.
+
+[USER] Is the tikka masala spicy?
+
+[STEWARD] Chicken Tikka Masala has a hot spice level. Chargrilled chicken chunks in creamy spiced masala gravy.
+
+[USER] Actually, cancel the Chicken Seekh Kebab and add the Chicken Tikka Masala instead.
+
+[STEWARD] Removed Chicken Seekh Kebab from the order. Added 1 x Chicken Tikka Masala. Your total is ₹758.

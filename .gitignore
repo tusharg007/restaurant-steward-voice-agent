@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.tsbuildinfo
+npm-debug.log*
+tmp/
+logs/conversation-20*.log
+Voice agent assessment.pdf

@@ -1,0 +1,15 @@
+[USER] Hi, what do you have?
+
+[STEWARD] Here are today's available choices - Starters: Paneer Tikka, Chicken Seekh Kebab, Crispy Corn; Mains: Butter Chicken, Chicken Tikka Masala, Dal Makhani, Veg Biryani; Drinks: Mango Lassi, Masala Chaas, Fresh Lime Soda; Desserts: Gulab Jamun, Kulfi Falooda, Rasmalai.
+
+[USER] I'll have the Butter Chicken and a Mango Lassi.
+
+[STEWARD] Added 1 x Butter Chicken. Added 1 x Mango Lassi. Your total is ₹548.
+
+[USER] Make it two lassis.
+
+[STEWARD] Updated Mango Lassi to quantity 2. Your total is ₹697.
+
+[USER] That's all, thanks.
+
+[STEWARD] Butter Chicken x1 (₹399), Mango Lassi x2 (₹298). Total: ₹697.

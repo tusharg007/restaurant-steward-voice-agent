@@ -1,0 +1,41 @@
+{
+  "restaurant": "Namaste Kitchen",
+  "currency": "INR",
+  "categories": [
+    {
+      "name": "Starters",
+      "items": [
+        { "id": "s1", "name": "Paneer Tikka", "price": 249, "description": "Marinated cottage cheese cubes grilled in tandoor with bell peppers", "tags": ["vegetarian", "gluten-free"], "spiceLevel": "medium", "available": true },
+        { "id": "s2", "name": "Chicken Seekh Kebab", "price": 299, "description": "Minced chicken kebabs with aromatic spices, served with mint chutney", "tags": ["non-veg"], "spiceLevel": "medium", "available": true },
+        { "id": "s3", "name": "Crispy Corn", "price": 199, "description": "Golden fried corn kernels tossed with spicy seasoning", "tags": ["vegan", "gluten-free"], "spiceLevel": "mild", "available": true },
+        { "id": "s4", "name": "Fish Amritsari", "price": 349, "description": "Battered fish fillets deep fried with carom seeds", "tags": ["non-veg", "seafood"], "spiceLevel": "medium", "available": false, "unavailableReason": "Fresh fish not available today" }
+      ]
+    },
+    {
+      "name": "Mains",
+      "items": [
+        { "id": "m1", "name": "Butter Chicken", "price": 399, "description": "Tender chicken in rich tomato-butter gravy with kasuri methi", "tags": ["non-veg"], "spiceLevel": "mild", "available": true },
+        { "id": "m2", "name": "Chicken Tikka Masala", "price": 429, "description": "Chargrilled chicken chunks in creamy spiced masala gravy", "tags": ["non-veg"], "spiceLevel": "hot", "available": true },
+        { "id": "m3", "name": "Dal Makhani", "price": 299, "description": "Slow-cooked black lentils in creamy buttery gravy", "tags": ["vegetarian"], "spiceLevel": "mild", "available": true },
+        { "id": "m4", "name": "Veg Biryani", "price": 329, "description": "Fragrant basmati rice layered with seasonal vegetables and whole spices", "tags": ["vegan"], "spiceLevel": "medium", "available": true, "limitedQuantity": 3 },
+        { "id": "m5", "name": "Mutton Rogan Josh", "price": 499, "description": "Slow-braised mutton in Kashmiri red chili gravy", "tags": ["non-veg"], "spiceLevel": "hot", "available": false, "unavailableReason": "Sold out for the day" }
+      ]
+    },
+    {
+      "name": "Drinks",
+      "items": [
+        { "id": "d1", "name": "Mango Lassi", "price": 149, "description": "Chilled yogurt smoothie with Alphonso mango pulp", "tags": ["vegetarian"], "available": true },
+        { "id": "d2", "name": "Masala Chaas", "price": 99, "description": "Spiced buttermilk with cumin and fresh mint", "tags": ["vegetarian"], "available": true },
+        { "id": "d3", "name": "Fresh Lime Soda", "price": 89, "description": "Freshly squeezed lime with soda, sweet or salted", "tags": ["vegan"], "available": true }
+      ]
+    },
+    {
+      "name": "Desserts",
+      "items": [
+        { "id": "x1", "name": "Gulab Jamun", "price": 149, "description": "Soft milk-solid dumplings soaked in rose-flavored sugar syrup", "tags": ["vegetarian"], "available": true },
+        { "id": "x2", "name": "Kulfi Falooda", "price": 199, "description": "Traditional Indian ice cream with vermicelli and rose syrup", "tags": ["vegetarian"], "available": true },
+        { "id": "x3", "name": "Rasmalai", "price": 179, "description": "Soft cottage cheese discs in sweetened, cardamom-flavored milk", "tags": ["vegetarian"], "available": true }
+      ]
+    }
+  ]
+}
