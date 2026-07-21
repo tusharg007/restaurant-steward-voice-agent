@@ -30,6 +30,28 @@ flowchart LR
 
 The orchestrator owns the turn lifecycle: transcribe input, append history, build a prompt with current state, bind tools to the session, request reasoning, record the answer, update reference context, and pass the answer to mocked TTS. The session keeps both a human-readable transcript and SDK-native model history, including structured assistant tool calls and matching tool results across turns. Only typed tools mutate order state; the LLM receives state as read-only context.
 
+## Scope and engineering priorities
+
+This solution is intentionally a focused orchestration implementation rather
+than a broad restaurant platform. Engineering effort is concentrated on:
+
+1. **Clean orchestration:** one `Orchestrator` owns each turn while model,
+   prompt, tool, state, and speech boundaries remain independently replaceable.
+2. **Correct state handling:** the cart is explicit, immutable application
+   state; totals and quantities are calculated by deterministic functions, not
+   inferred from conversation text.
+3. **Grounding:** menu facts come from one JSON dataset, and tools revalidate
+   item identity, availability, limits, and quantities before every mutation.
+4. **Practical reproducibility:** the deterministic client, CLI, generated
+   transcripts, and focused tests run without credentials or network access.
+
+Deliberately out of scope are a polished web UI, production speech services,
+payments, taxes, fulfillment, shared inventory, durable multi-session storage,
+and production observability. Adding those would increase surface area without
+improving the assessment's core orchestration, state, or grounding evidence.
+The existing interfaces leave room to replace the CLI, mocks, or in-memory
+session later without rewriting the business tools.
+
 ## Requirements
 
 - Node.js 20 or newer
@@ -96,6 +118,14 @@ Every model-supplied argument is validated before tool execution. This reduces m
 ### Dual reasoning modes
 
 `OpenAIClient` uses the Vercel AI SDK and a five-step tool loop. `MockLLMClient` provides deterministic intent handling for development, demos, and tests without network access or credentials. The mock is deliberately domain-specific; it is a reliable fallback, not a general-language replacement for an LLM.
+
+### CLI and mocked speech instead of UI and audio infrastructure
+
+The CLI keeps multi-turn behavior visible, makes transcripts reproducible, and
+demonstrates the same orchestration path used by either reasoning client. Mocked
+STT/TTS boundaries avoid unrelated audio and frontend complexity. The tradeoff
+is that this repository demonstrates voice-agent orchestration rather than live
+audio capture, synthesis, or a polished customer interface.
 
 ### Pure state functions
 
