@@ -54,7 +54,7 @@ npm run build
 npm run test
 ```
 
-The seven focused tests demonstrate:
+The thirteen focused tests demonstrate:
 
 1. Mid-conversation cancel-and-replace intent handling
 2. Unavailable-item rejection with grounded alternatives
@@ -63,6 +63,12 @@ The seven focused tests demonstrate:
 5. Enforcement of limited quantities
 6. Structured assistant tool-call and tool-result history across turns
 7. Dietary-compatible alternatives for unavailable items
+8. Price and description questions that never mutate the order
+9. Item-specific vegan answers
+10. Whole-order clearing
+11. Grounded mild-item recommendations
+12. Greetings, thanks, and goodbyes
+13. Reference resolution sourced from session context
 
 Regenerate both checked-in sample transcripts by driving the actual CLI in
 deterministic mock mode:

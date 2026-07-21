@@ -6,7 +6,11 @@ import { createBoundTools } from '../tools/registry.js';
 import type { ConversationMessage } from '../types/conversation.js';
 import type { Menu } from '../types/menu.js';
 import type { OrderState } from '../types/order.js';
-import type { LLMClient, LLMResponse } from './llm-client.js';
+import type {
+  LLMClient,
+  LLMResponse,
+  LLMRuntimeContext,
+} from './llm-client.js';
 import { buildSystemPrompt } from './prompt-builder.js';
 
 export class Orchestrator {
@@ -36,10 +40,16 @@ export class Orchestrator {
       this.session.getLastMentionedItem(),
     );
     const tools = createBoundTools(this.session, this.menu);
+    const runtimeContext: LLMRuntimeContext = {};
+    const lastMentionedItemId = this.session.getLastMentionedItem();
+    if (lastMentionedItemId !== undefined) {
+      runtimeContext.lastMentionedItemId = lastMentionedItemId;
+    }
     const response = await this.llmClient.generateResponse(
       systemPrompt,
       this.session.getModelHistory(),
       tools,
+      runtimeContext,
     );
     const agentReply =
       response.text.trim() || 'I am sorry, I could not complete that request.';
@@ -68,6 +78,10 @@ export class Orchestrator {
     userInput: string,
     orderBeforeTurn: OrderState,
   ): void {
+    if (response.clearLastMentionedItem) {
+      this.session.clearLastMentionedItem();
+      return;
+    }
     const explicitId = response.referencedItemIds?.at(-1);
     if (explicitId) {
       this.session.setLastMentionedItem(explicitId);

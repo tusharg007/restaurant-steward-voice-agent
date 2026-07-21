@@ -19,6 +19,11 @@ export interface LLMResponse {
   text: string;
   referencedItemIds?: string[];
   responseMessages?: ModelMessage[];
+  clearLastMentionedItem?: boolean;
+}
+
+export interface LLMRuntimeContext {
+  lastMentionedItemId?: string;
 }
 
 export interface LLMClient {
@@ -26,6 +31,7 @@ export interface LLMClient {
     systemPrompt: string,
     messages: ModelMessage[],
     tools: AgentTools,
+    context: LLMRuntimeContext,
   ): Promise<LLMResponse>;
 }
 
@@ -68,6 +74,7 @@ export class OpenAIClient implements LLMClient {
     systemPrompt: string,
     messages: ModelMessage[],
     tools: AgentTools,
+    _context: LLMRuntimeContext,
   ): Promise<LLMResponse> {
     const result = await this.generate({
       model: this.provider(this.model),
@@ -220,7 +227,6 @@ async function runTool<T>(toolDefinition: unknown, input: unknown): Promise<T> {
 
 export class MockLLMClient implements LLMClient {
   private readonly menu: Menu;
-  private lastMentionedItemId?: string;
 
   constructor(menu: Menu) {
     this.menu = structuredClone(menu);
@@ -230,6 +236,7 @@ export class MockLLMClient implements LLMClient {
     _systemPrompt: string,
     messages: ModelMessage[],
     tools: AgentTools,
+    context: LLMRuntimeContext,
   ): Promise<LLMResponse> {
     const latestUserMessage = [...messages]
       .reverse()
@@ -239,10 +246,49 @@ export class MockLLMClient implements LLMClient {
     const mentionedItems = resolveMentionedItems(input, this.menu);
     const referencedItemIds = mentionedItems.map((item) => item.id);
 
+    if (/^(hi|hello|hey|good morning|good afternoon|good evening)$/.test(normalized)) {
+      return {
+        text: "Welcome to Namaste Kitchen! I'm here to help with your order. Would you like to see our menu?",
+      };
+    }
+
+    if (/^(thanks|thank you|thank you very much)$/.test(normalized)) {
+      return {
+        text: "You're welcome! Is there anything else I can help you with?",
+      };
+    }
+
+    if (/^(bye|goodbye|see you)$/.test(normalized)) {
+      return { text: 'Goodbye! Thank you for visiting Namaste Kitchen.' };
+    }
+
     if (/\bvegan\b/.test(normalized)) {
       const veganItems = getItemsByTag('vegan', this.menu).filter(
         (item) => item.available,
       );
+      if (mentionedItems.length > 1) {
+        return {
+          text: `Which item do you mean: ${mentionedItems.map((item) => item.name).join(' or ')}?`,
+          referencedItemIds,
+        };
+      }
+      if (mentionedItems.length === 1) {
+        const item = mentionedItems[0]!;
+        const isVegan = item.tags.includes('vegan');
+        const dietaryDescription = isVegan
+          ? `${item.name} is vegan.`
+          : item.tags.includes('vegetarian')
+            ? `${item.name} is vegetarian, but it is not vegan.`
+            : `${item.name} is not vegan.`;
+        return {
+          text: `${isVegan ? 'Yes' : 'No'}, ${dietaryDescription} ${item.description}. ${
+            isVegan
+              ? ''
+              : `Our vegan options include ${veganItems.map((candidate) => candidate.name).join(', ')}.`
+          }`.trim(),
+          referencedItemIds: [item.id],
+        };
+      }
       return {
         text: `Our vegan options are ${veganItems.map((item) => `${item.name} (${formatMoney(item.price)})`).join(', ')}.`,
         referencedItemIds: veganItems.map((item) => item.id),
@@ -250,6 +296,20 @@ export class MockLLMClient implements LLMClient {
     }
 
     if (/\bspic(y|e|iness)\b/.test(normalized)) {
+      if (
+        mentionedItems.length === 0 &&
+        /\b(not too spicy|mild|less spicy|low spice)\b/.test(normalized)
+      ) {
+        const mildItems = getAvailableItems(this.menu)
+          .filter((item) => item.spiceLevel === 'mild')
+          .slice(0, 3);
+        return {
+          text: `Here are some mild options: ${mildItems
+            .map((item) => `${item.name} (${formatMoney(item.price)}, mild)`)
+            .join(', ')}.`,
+          referencedItemIds: mildItems.map((item) => item.id),
+        };
+      }
       if (mentionedItems.length !== 1) {
         return {
           text:
@@ -260,7 +320,6 @@ export class MockLLMClient implements LLMClient {
         };
       }
       const item = mentionedItems[0]!;
-      this.lastMentionedItemId = item.id;
       return {
         text: `${item.name} has a ${item.spiceLevel ?? 'not specified'} spice level. ${item.description}.`,
         referencedItemIds: [item.id],
@@ -287,10 +346,84 @@ export class MockLLMClient implements LLMClient {
       return { text: summary.formattedSummary };
     }
 
+    const asksPrice = /\b(how much|price|cost)\b/.test(normalized);
+    const asksDescription =
+      /\b(tell me about|what s in|what is in|describe|description|details|ingredients)\b/.test(
+        normalized,
+      ) || /^what is\b/.test(normalized);
+    const asksAvailability =
+      /\b(is|are).+\bavailable\b/.test(normalized) ||
+      (/\bdo you have\b/.test(normalized) && mentionedItems.length > 0);
+
+    if (asksPrice || asksDescription || asksAvailability) {
+      if (mentionedItems.length !== 1) {
+        return {
+          text:
+            mentionedItems.length > 1
+              ? `Which item do you mean: ${mentionedItems.map((item) => item.name).join(' or ')}?`
+              : 'Which menu item would you like to know about?',
+          referencedItemIds,
+        };
+      }
+
+      const item = mentionedItems[0]!;
+      if (asksPrice) {
+        return {
+          text: `${item.name} is ${formatMoney(item.price)}. Would you like to add it to your order?`,
+          referencedItemIds: [item.id],
+        };
+      }
+      if (asksAvailability) {
+        const availability = await runTool<AvailabilityResult>(
+          tools.checkAvailability,
+          { itemName: item.name },
+        );
+        return {
+          text: availability.available
+            ? `Yes, ${item.name} is available at ${formatMoney(item.price)}.`
+            : `${item.name} is unavailable${availability.reason ? ` - ${availability.reason}` : ''}.`,
+          referencedItemIds: [item.id],
+        };
+      }
+      return {
+        text: `${item.name}: ${item.description}. It costs ${formatMoney(item.price)}. Would you like to add it?`,
+        referencedItemIds: [item.id],
+      };
+    }
+
     const wantsRemoval = /\b(cancel|remove|delete)\b/.test(normalized);
     const wantsQuantityChange = /\b(make it|change|update|quantity)\b/.test(
       normalized,
     );
+    const wantsAddition = /\b(add|take|want|have|get|order|i ll|i will)\b/.test(
+      normalized,
+    );
+
+    if (
+      wantsRemoval &&
+      /\b(everything|all|entire order|whole order)\b/.test(normalized)
+    ) {
+      if (summary.items.length === 0) {
+        return {
+          text: 'Your order is already empty.',
+          clearLastMentionedItem: true,
+        };
+      }
+      for (const item of summary.items) {
+        await runTool<ModifyOrderResult>(tools.modifyOrder, {
+          itemId: item.menuItemId,
+          action: 'remove',
+        });
+      }
+      const removedItemCount = summary.items.reduce(
+        (total, item) => total + item.quantity,
+        0,
+      );
+      return {
+        text: `Removed all ${removedItemCount} item${removedItemCount === 1 ? '' : 's'}. Your order is now empty. Total: ${formatMoney(0)}.`,
+        clearLastMentionedItem: true,
+      };
+    }
 
     if (mentionedItems.length > 1 && !wantsRemoval) {
       const explicitlyListsMultipleItems = /\b(and|plus)\b|,/.test(normalized);
@@ -302,8 +435,20 @@ export class MockLLMClient implements LLMClient {
       }
     }
 
+    if (
+      mentionedItems.length > 0 &&
+      !wantsRemoval &&
+      !wantsQuantityChange &&
+      !wantsAddition
+    ) {
+      return {
+        text: `Would you like to add ${mentionedItems.map((item) => item.name).join(' and ')} to your order?`,
+        referencedItemIds,
+      };
+    }
+
     if ((wantsRemoval || wantsQuantityChange) && mentionedItems.length === 0) {
-      let targetId = this.lastMentionedItemId;
+      let targetId = context.lastMentionedItemId;
       if (!targetId && summary.items.length === 1) {
         targetId = summary.items[0]!.menuItemId;
       }
@@ -324,17 +469,19 @@ export class MockLLMClient implements LLMClient {
           ? { newQuantity: parseQuantity(input) }
           : {}),
       });
-      if (modification.success) {
-        this.lastMentionedItemId = targetId;
-      }
-      return {
+      const response: LLMResponse = {
         text: `${modification.message} ${
           modification.success
             ? `Your total is ${formatMoney(modification.orderState.totalAmount)}.`
             : ''
         }`.trim(),
-        referencedItemIds: [targetId],
       };
+      if (action === 'remove' && modification.success) {
+        response.clearLastMentionedItem = true;
+      } else {
+        response.referencedItemIds = [targetId];
+      }
+      return response;
     }
 
     const removalTargets = wantsRemoval
@@ -357,9 +504,6 @@ export class MockLLMClient implements LLMClient {
       });
       confirmations.push(result.message);
       changed ||= result.success;
-      if (result.success) {
-        this.lastMentionedItemId = item.id;
-      }
     }
 
     const requestedQuantity = parseQuantity(input);
@@ -375,9 +519,6 @@ export class MockLLMClient implements LLMClient {
         });
         confirmations.push(result.message);
         changed ||= result.success;
-        if (result.success) {
-          this.lastMentionedItemId = item.id;
-        }
         continue;
       }
 
@@ -403,9 +544,6 @@ export class MockLLMClient implements LLMClient {
       });
       confirmations.push(result.message);
       changed ||= result.success;
-      if (result.success) {
-        this.lastMentionedItemId = item.id;
-      }
     }
 
     if (confirmations.length > 0) {
@@ -413,12 +551,17 @@ export class MockLLMClient implements LLMClient {
         tools.getOrderSummary,
         {},
       );
-      return {
+      const response: LLMResponse = {
         text: `${confirmations.join(' ')}${
           changed ? ` Your total is ${formatMoney(latestSummary.totalAmount)}.` : ''
         }`,
-        referencedItemIds,
       };
+      if (wantsRemoval && additionTargets.length === 0 && changed) {
+        response.clearLastMentionedItem = true;
+      } else {
+        response.referencedItemIds = referencedItemIds;
+      }
+      return response;
     }
 
     if (/\b(add|take|want|have|get|order)\b/.test(normalized)) {

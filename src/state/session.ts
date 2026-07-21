@@ -53,6 +53,10 @@ export class SessionManager {
     this.lastMentionedItemId = itemId;
   }
 
+  clearLastMentionedItem(): void {
+    delete this.lastMentionedItemId;
+  }
+
   getLastMentionedItem(): string | undefined {
     return this.lastMentionedItemId;
   }
