@@ -196,4 +196,45 @@ describe('core orchestration', () => {
     expect(response).toContain('Quantity must be a positive whole number');
     expect(orchestrator.getOrderState().items).toHaveLength(0);
   });
+
+  test('processes a comma-separated quantified order while enforcing item limits', async () => {
+    const menu = loadMenu();
+    const orchestrator = new Orchestrator(menu, new MockLLMClient(menu));
+
+    const response = await orchestrator.processUserInput(
+      '5 veg biryani, 2 gulab jamun, 2 butter chicken, 1 paneer tikka',
+    );
+
+    expect(response).toContain(
+      'Veg Biryani has limited availability: only 3 can be ordered',
+    );
+    expect(response).toContain('Added 2 x Gulab Jamun');
+    expect(response).toContain('Added 2 x Butter Chicken');
+    expect(response).toContain('Added 1 x Paneer Tikka');
+    expect(response).toContain('Your total is \u20b91,345');
+    expect(orchestrator.getOrderState()).toMatchObject({
+      items: [
+        {
+          menuItemId: 's1',
+          name: 'Paneer Tikka',
+          quantity: 1,
+          subtotal: 249,
+        },
+        {
+          menuItemId: 'm1',
+          name: 'Butter Chicken',
+          quantity: 2,
+          subtotal: 798,
+        },
+        {
+          menuItemId: 'x1',
+          name: 'Gulab Jamun',
+          quantity: 2,
+          subtotal: 298,
+        },
+      ],
+      itemCount: 5,
+      totalAmount: 1345,
+    });
+  });
 });

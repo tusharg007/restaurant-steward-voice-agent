@@ -54,7 +54,7 @@ npm run build
 npm run test
 ```
 
-The eighteen focused tests demonstrate:
+The nineteen focused tests demonstrate:
 
 1. Mid-conversation cancel-and-replace intent handling
 2. Unavailable-item rejection with grounded alternatives
@@ -74,6 +74,7 @@ The eighteen focused tests demonstrate:
 16. Adding a previously removed item back through pronoun context
 17. Item-specific gluten-free tag answers
 18. Rejection of signed negative quantities
+19. Comma-separated quantified orders with per-item availability limits
 
 Regenerate both checked-in sample transcripts by driving the actual CLI in
 deterministic mock mode:

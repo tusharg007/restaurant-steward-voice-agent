@@ -163,6 +163,13 @@ function parsePerItemQuantity(input: string, itemName: string): number {
   return 1;
 }
 
+function isExplicitMultiItemListing(input: string, itemCount: number): boolean {
+  return (
+    itemCount >= 2 &&
+    (/,/.test(input) || /\b(and|plus)\b/i.test(input))
+  );
+}
+
 function menuItems(menu: Menu): MenuItem[] {
   return menu.categories.flatMap((category) => category.items);
 }
@@ -594,7 +601,10 @@ export class MockLLMClient implements LLMClient {
     }
 
     if (mentionedItems.length > 1 && !wantsRemoval) {
-      const explicitlyListsMultipleItems = /\b(and|plus)\b|,/.test(normalized);
+      const explicitlyListsMultipleItems = isExplicitMultiItemListing(
+        input,
+        mentionedItems.length,
+      );
       if (!explicitlyListsMultipleItems) {
         return {
           text: `Did you mean ${mentionedItems.map((item) => item.name).join(' or ')}?`,
@@ -612,9 +622,10 @@ export class MockLLMClient implements LLMClient {
       !wantsQuantityChange &&
       !wantsAddition
     ) {
-      const isItemListing =
-        mentionedItems.length >= 2 &&
-        (/,/.test(normalized) || /\band\b/.test(normalized));
+      const isItemListing = isExplicitMultiItemListing(
+        input,
+        mentionedItems.length,
+      );
 
       // If the previous assistant turn was asking about something (spice,
       // price, description, tag) and the user just names an item to answer
